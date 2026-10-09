@@ -4,6 +4,12 @@
 
 ## 免費本機測試
 
+### Bolt 網頁預覽
+
+Bolt 會使用 Node.js 原生 HTTP 伺服器顯示這個互動測試頁，不需新增套件或付費服務。Bolt 匯入最新 GitHub 版本後執行 `pnpm run dev`（或 `npm run dev`），即可開啟預覽。預約資料只保存在目前瀏覽器的 localStorage。
+
+### Expo 手機版
+
 需要 Node.js 及 pnpm。安裝依賴後執行：
 
 ```sh
@@ -11,7 +17,7 @@ pnpm install --ignore-scripts
 pnpm exec expo start
 ```
 
-用 Expo Go 掃描終端機顯示的 QR code 開啟手機版。測試畫面會直接開啟「安心代駕」開發版，無須 Clerk、Google Maps、Neon 或 Stripe 金鑰。此 Expo 51 專案以手機版為測試目標。
+用 Expo Go 掃描終端機顯示的 QR code 開啟手機版。測試畫面會直接開啟「安心代駕」開發版，無須 Clerk、Google Maps、Neon 或 Stripe 金鑰。此 Expo 51 專案以手機版為測試目標；Bolt 網頁預覽使用上方的獨立網頁測試介面。
 
 ## 建議測試流程
 
