@@ -14,6 +14,10 @@ export type Booking = {
   vehicle: string;
   tripType: "即時" | "預約";
   scheduledAt: string;
+  estimatedFare?: number;
+  estimatedMinutes?: number;
+  nightSurcharge?: boolean;
+  paymentMethod?: "現金" | "轉數快";
   transmission: "自動波" | "手動波";
   condition: string;
   insuranceReference: string;
@@ -69,7 +73,7 @@ export function createBooking(
     | "authorization"
     | "tripType"
     | "scheduledAt"
-  >,
+  > & Partial<Pick<Booking, "estimatedFare" | "estimatedMinutes" | "nightSurcharge" | "paymentMethod">>,
 ): Booking {
   assert(
     input.pickup.trim() && input.destination.trim(),
