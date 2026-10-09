@@ -33,7 +33,9 @@ jobs:
           git add package-lock.json
           if ! git diff --cached --quiet; then
             git commit -m 'chore: lock Expo SDK 57 dependencies [skip ci]'
-            git push
+            git fetch origin "$GITHUB_REF_NAME"
+            git rebase "origin/$GITHUB_REF_NAME"
+            git push origin "HEAD:$GITHUB_REF_NAME"
           fi
       - name: Verify Expo packages
         run: npx expo install --check
