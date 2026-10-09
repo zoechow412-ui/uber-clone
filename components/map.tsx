@@ -90,7 +90,7 @@ export const Map = () => {
       className="w-full h-full rounded-2xl"
       tintColor="black"
       mapType="mutedStandard"
-      showsPointsOfInterests={false}
+      showsPointsOfInterest={false}
       initialRegion={region}
       showsUserLocation
       userInterfaceStyle="light"

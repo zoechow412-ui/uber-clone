@@ -3,7 +3,6 @@
   "main": "expo-router/entry",
   "version": "1.0.1",
   "scripts": {
-    "dev": "node preview/server.mjs",
     "start": "expo start",
     "reset-project": "node ./scripts/reset-project.js",
     "android": "expo start --android",
@@ -55,11 +54,11 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/sanidhyy/uber-clone.git"
+    "url": "https://github.com/zoechow412-ui/uber-clone.git"
   },
-  "homepage": "https://github.com/sanidhyy/uber-clone#readme",
+  "homepage": "https://github.com/zoechow412-ui/uber-clone#readme",
   "bugs": {
-    "url": "https://github.com/sanidhyy/uber-clone/issues",
+    "url": "https://github.com/zoechow412-ui/uber-clone/issues",
     "email": "sanidhyyy@gmail.com"
   },
   "funding": [
@@ -81,7 +80,7 @@
     "@neondatabase/serverless": "^0.9.4",
     "@react-native/assets-registry": "0.74.87",
     "@react-navigation/native": "^6.0.2",
-    "@stripe/stripe-react-native": "^0.38.4",
+    "@stripe/stripe-react-native": "^0.37.2",
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-prettier": "^5.2.1",
     "expo": "~51.0.28",
@@ -100,9 +99,9 @@
     "react": "18.2.0",
     "react-dom": "18.2.0",
     "react-native": "0.74.5",
-    "react-native-gesture-handler": "^2.19.0",
+    "react-native-gesture-handler": "^2.16.2",
     "react-native-google-places-autocomplete": "^2.5.6",
-    "react-native-maps": "^1.18.0",
+    "react-native-maps": "^1.14.0",
     "react-native-maps-directions": "^1.9.0",
     "react-native-modal": "^13.0.1",
     "react-native-reanimated": "~3.10.1",
