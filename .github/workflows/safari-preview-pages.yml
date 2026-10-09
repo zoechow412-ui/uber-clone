@@ -1,0 +1,54 @@
+name: Safari passenger preview (no Expo Go)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: github-pages-passenger
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.23.1"
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps --no-audit --no-fund
+      - name: Set base path for GitHub Pages
+        run: |
+          node -e "const fs=require('fs'); const c=JSON.parse(fs.readFileSync('app.json','utf8')); c.expo.experiments={...(c.expo.experiments||{}),baseUrl:'/uber-clone'}; fs.writeFileSync('app.json',JSON.stringify(c,null,2));"
+      - name: Export Expo website
+        run: npx expo export --platform web --clear
+      - name: Support iPhone Safari page reload
+        run: |
+          cp dist/index.html dist/404.html
+          touch dist/.nojekyll
+      - name: Upload static preview
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy web preview
+        id: deployment
+        uses: actions/deploy-pages@v4
