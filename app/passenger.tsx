@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { PassengerMap } from "@/components/passenger-map";
 import * as Location from "expo-location";
 import { useMemo, useState } from "react";
 import {
@@ -110,6 +111,7 @@ export default function Passenger() {
   const [night, setNight] = useState(true);
   const [paymentMethod, setPaymentMethod] = useState<"現金" | "轉數快">("現金");
   const [locating, setLocating] = useState(false);
+  const [mapPoint, setMapPoint] = useState<{ latitude: number; longitude: number } | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const estimate = Math.max(200, Math.ceil(minutes / 15) * 60) + (night ? 60 : 0);
@@ -133,10 +135,21 @@ export default function Passenger() {
         ? [address.streetNumber, address.street, address.district, address.city].filter(Boolean).join(" ")
         : position.coords.latitude.toFixed(5) + ", " + position.coords.longitude.toFixed(5);
       setPickup(formatted);
+      setMapPoint({ latitude: position.coords.latitude, longitude: position.coords.longitude });
     } catch {
       notice("目前無法取得定位，請手動輸入地址。");
     } finally {
       setLocating(false);
+    }
+  }
+  async function selectOnMap(point: { latitude: number; longitude: number }) {
+    setMapPoint(point);
+    try {
+      const results = await Location.reverseGeocodeAsync(point);
+      const addr = results[0];
+      setPickup(addr ? [addr.streetNumber, addr.street, addr.district, addr.city].filter(Boolean).join(" ") : `${point.latitude.toFixed(5)}, ${point.longitude.toFixed(5)}`);
+    } catch {
+      setPickup(`${point.latitude.toFixed(5)}, ${point.longitude.toFixed(5)}`);
     }
   }
   function order() {
@@ -182,11 +195,7 @@ export default function Passenger() {
         {tab === "叫代駕" && <>
           <Text style={{ color: C.ink, fontSize: 27, fontWeight: "900", marginTop: 24 }}>去邊度？我哋幫你揸。</Text>
           <Text style={{ color: C.muted, marginTop: 7, lineHeight: 20 }}>司機上門接你同你架車，安全送到目的地。</Text>
-          <View style={{ height: 174, backgroundColor: C.mist, marginTop: 17, borderRadius: 20, justifyContent: "center", alignItems: "center", overflow: "hidden" }}>
-            <Ionicons name="map-outline" color={C.green2} size={46}/>
-            <Text style={{ color: C.green, fontWeight: "800", marginTop: 10 }}>香港地區 · 地圖預覽</Text>
-            <Text style={{ color: C.muted, fontSize: 12, marginTop: 5 }}>測試版未連接正式地圖路線服務</Text>
-          </View>
+          <PassengerMap latitude={mapPoint?.latitude} longitude={mapPoint?.longitude} onSelect={selectOnMap}/>
           <Card>
             <Text style={{ fontSize: 18, fontWeight: "900", color: C.ink }}>行程資料</Text>
             <Field label="司機到場接車位置" value={pickup} onChangeText={setPickup} hint="請輸入接車地址"/>
