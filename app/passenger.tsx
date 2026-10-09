@@ -1,7 +1,20 @@
 import { Ionicons } from "@expo/vector-icons";
 import { PassengerMap } from "@/components/passenger-map";
+import { PassengerAddressSearch } from "@/components/passenger-address-search";
+import { PassengerInfo } from "@/components/passenger-info";
+import {
+  passengerApi,
+  readSession,
+  writeSession,
+  type Booking,
+  type Customer,
+  type Point,
+  type Pricing,
+  type SavedLocation,
+  type Vehicle,
+} from "@/lib/passenger-api";
 import * as Location from "expo-location";
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -14,292 +27,1497 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { createBooking, advanceBooking, initialState, type Booking } from "@/lib/designated-driver";
-import { useDesignatedDriver } from "@/store/designated-driver";
 
-type Tab = "叫代駕" | "我的行程" | "我的";
-const C = {
-  green: "#103C31", green2: "#176E54", mist: "#E7F2ED",
-  bg: "#F7F9F8", ink: "#16231F", muted: "#687670",
-  border: "#E3EAE5", white: "#FFFFFF", danger: "#B23A37",
+type Tab = "首頁" | "我的行程" | "我的";
+type VehicleForm = Pick<
+  Vehicle,
+  | "plate"
+  | "make"
+  | "model"
+  | "transmission"
+  | "requirements"
+  | "existing_damage"
+  | "insurance_company"
+  | "insurance_reference"
+  | "insurance_expiry"
+>;
+const emptyVehicle: VehicleForm = {
+  plate: "",
+  make: "",
+  model: "",
+  transmission: "auto",
+  requirements: "",
+  existing_damage: "",
+  insurance_company: "",
+  insurance_reference: "",
+  insurance_expiry: "",
 };
-const STATUSES: Record<Booking["status"], string> = {
-  requested: "等候安排司機",
+const C = {
+  green: "#103C31",
+  green2: "#176E54",
+  mist: "#E7F2ED",
+  bg: "#F7F9F8",
+  ink: "#16231F",
+  muted: "#687670",
+  border: "#E3EAE5",
+  white: "#FFFFFF",
+  danger: "#B23A37",
+};
+const statuses: Record<string, string> = {
+  awaiting_arrangement: "等待安排司機",
   accepted: "司機已接單",
+  on_the_way: "司機前往接車地點",
   arrived: "司機已到達",
-  driving: "代駕途中",
-  completed: "行程完成",
+  driving: "代駕進行中",
+  safely_arrived: "已安全到達",
+  completed: "已完成",
   cancelled: "已取消",
 };
-const today = () => {
-  const d = new Date();
-  return [d.getFullYear(), String(d.getMonth() + 1).padStart(2, "0"), String(d.getDate()).padStart(2, "0")].join("-");
-};
+const problem = (error: unknown) =>
+  error instanceof Error ? error.message : "操作失敗，請稍後再試";
 function notice(message: string) {
   if (Platform.OS === "web") {
     if (typeof window !== "undefined") window.alert(message);
-  } else {
-    Alert.alert("安心代駕", message);
-  }
+  } else Alert.alert("安心代駕", message);
 }
 function Card({ children }: { children: ReactNode }) {
-  return <View style={{ marginTop: 14, padding: 18, borderRadius: 20, backgroundColor: C.white, borderWidth: 1, borderColor: C.border }}>{children}</View>;
+  return (
+    <View
+      style={{
+        marginTop: 14,
+        padding: 18,
+        borderRadius: 20,
+        backgroundColor: C.white,
+        borderWidth: 1,
+        borderColor: C.border,
+      }}
+    >
+      {children}
+    </View>
+  );
 }
-function Field({ label, value, onChangeText, hint, autoCapitalize = "sentences" }: {
-  label: string; value: string; onChangeText: (s: string) => void; hint: string;
+function Field({
+  label,
+  value,
+  onChangeText,
+  hint,
+  secureTextEntry = false,
+  autoCapitalize = "sentences",
+  keyboardType = "default",
+}: {
+  label: string;
+  value: string;
+  onChangeText: (s: string) => void;
+  hint: string;
+  secureTextEntry?: boolean;
   autoCapitalize?: "none" | "sentences" | "characters";
+  keyboardType?: "default" | "email-address" | "numeric";
 }) {
-  return <View style={{ marginTop: 15 }}>
-    <Text style={{ color: C.ink, fontWeight: "600", fontSize: 13, marginBottom: 8 }}>{label}</Text>
-    <TextInput
-      accessibilityLabel={label}
-      value={value}
-      onChangeText={onChangeText}
-      placeholder={hint}
-      autoCapitalize={autoCapitalize}
-      placeholderTextColor="#9BA9A1"
-      style={{ paddingHorizontal: 13, paddingVertical: 13, borderRadius: 12, borderWidth: 1, borderColor: C.border, fontSize: 16, color: C.ink, backgroundColor: C.bg }}
-    />
-  </View>;
+  return (
+    <View style={{ marginTop: 15 }}>
+      <Text
+        style={{
+          color: C.ink,
+          fontWeight: "600",
+          fontSize: 13,
+          marginBottom: 8,
+        }}
+      >
+        {label}
+      </Text>
+      <TextInput
+        accessibilityLabel={label}
+        value={value}
+        onChangeText={onChangeText}
+        placeholder={hint}
+        secureTextEntry={secureTextEntry}
+        autoCapitalize={autoCapitalize}
+        keyboardType={keyboardType}
+        placeholderTextColor="#9BA9A1"
+        style={{
+          paddingHorizontal: 13,
+          paddingVertical: 13,
+          borderRadius: 12,
+          borderWidth: 1,
+          borderColor: C.border,
+          fontSize: 16,
+          color: C.ink,
+          backgroundColor: C.bg,
+        }}
+      />
+    </View>
+  );
 }
-function MainButton({ title, onPress, disabled = false, outline = false }: { title: string; onPress: () => void; disabled?: boolean; outline?: boolean }) {
-  return <Pressable accessibilityRole="button" disabled={disabled} onPress={onPress} style={{
-    minHeight: 53, borderRadius: 14, marginTop: 15, alignItems: "center", justifyContent: "center",
-    backgroundColor: disabled ? "#B6C5BC" : outline ? C.white : C.green,
-    borderWidth: outline ? 1 : 0, borderColor: C.green,
-  }}>
-    <Text style={{ fontWeight: "800", color: outline ? C.green : C.white, fontSize: 16 }}>{title}</Text>
-  </Pressable>;
-}
-function Choice<T extends string | number>({ items, value, onChange, display }: {
-  items: readonly T[]; value: T; onChange: (n: T) => void; display?: (n: T) => string;
+function MainButton({
+  title,
+  onPress,
+  disabled = false,
+  outline = false,
+}: {
+  title: string;
+  onPress: () => void;
+  disabled?: boolean;
+  outline?: boolean;
 }) {
-  return <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 11 }}>
-    {items.map(item => <Pressable
-      key={String(item)} onPress={() => onChange(item)}
-      accessibilityRole="button" accessibilityState={{ selected: value === item }}
-      style={{ paddingHorizontal: 13, paddingVertical: 11, borderRadius: 12, backgroundColor: value === item ? C.mist : C.bg, borderWidth: 1, borderColor: value === item ? C.green2 : C.border }}
-    ><Text style={{ fontWeight: "700", color: value === item ? C.green : C.muted }}>{display ? display(item) : String(item)}</Text></Press>)}
-  </View>;
+  return (
+    <Pressable
+      accessibilityRole="button"
+      disabled={disabled}
+      onPress={onPress}
+      style={{
+        minHeight: 53,
+        borderRadius: 14,
+        marginTop: 15,
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: disabled ? "#B6C5BC" : outline ? C.white : C.green,
+        borderWidth: outline ? 1 : 0,
+        borderColor: C.green,
+      }}
+    >
+      <Text
+        style={{
+          fontWeight: "800",
+          color: outline ? C.green : C.white,
+          fontSize: 16,
+        }}
+      >
+        {title}
+      </Text>
+    </Pressable>
+  );
 }
-function Check({ value, onChange, text }: { value: boolean; onChange: (v: boolean) => void; text: string }) {
-  return <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: value }} onPress={() => onChange(!value)} style={{ flexDirection: "row", alignItems: "flex-start", marginTop: 15, gap: 10 }}>
-    <Ionicons name={value ? "checkbox" : "square-outline"} size={23} color={C.green2} />
-    <Text style={{ color: C.ink, fontSize: 13, lineHeight: 21, flex: 1 }}>{text}</Text>
-  </Pressable>;
+function Choice<T extends string | number>({
+  items,
+  value,
+  onChange,
+  display,
+}: {
+  items: readonly T[];
+  value: T;
+  onChange: (n: T) => void;
+  display?: (n: T) => string;
+}) {
+  return (
+    <View
+      style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 11 }}
+    >
+      {items.map((item) => (
+        <Pressable
+          key={String(item)}
+          onPress={() => onChange(item)}
+          accessibilityRole="button"
+          accessibilityState={{ selected: value === item }}
+          style={{
+            paddingHorizontal: 13,
+            paddingVertical: 11,
+            borderRadius: 12,
+            backgroundColor: value === item ? C.mist : C.bg,
+            borderWidth: 1,
+            borderColor: value === item ? C.green2 : C.border,
+          }}
+        >
+          <Text
+            style={{
+              fontWeight: "700",
+              color: value === item ? C.green : C.muted,
+            }}
+          >
+            {display ? display(item) : String(item)}
+          </Text>
+        </Pressable>
+      ))}
+    </View>
+  );
 }
+function Check({
+  value,
+  onChange,
+  text,
+}: {
+  value: boolean;
+  onChange: (v: boolean) => void;
+  text: string;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="checkbox"
+      accessibilityState={{ checked: value }}
+      onPress={() => onChange(!value)}
+      style={{
+        flexDirection: "row",
+        alignItems: "flex-start",
+        marginTop: 15,
+        gap: 10,
+      }}
+    >
+      <Ionicons
+        name={value ? "checkbox" : "square-outline"}
+        size={23}
+        color={C.green2}
+      />
+      <Text style={{ color: C.ink, fontSize: 13, lineHeight: 21, flex: 1 }}>
+        {text}
+      </Text>
+    </Pressable>
+  );
+}
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <View
+      style={{
+        flexDirection: "row",
+        justifyContent: "space-between",
+        gap: 12,
+        marginTop: 10,
+      }}
+    >
+      <Text style={{ color: C.muted, flex: 1 }}>{label}</Text>
+      <Text
+        style={{ color: C.ink, fontWeight: "700", flex: 2, textAlign: "right" }}
+      >
+        {value}
+      </Text>
+    </View>
+  );
+}
+const scheduledIso = (input: string) => {
+  const match = input
+    .trim()
+    .match(/^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2})$/);
+  if (!match) return null;
+  const [, y, m, d, h, min] = match;
+  const parsed = new Date(`${y}-${m}-${d}T${h}:${min}:00+08:00`);
+  if (Number.isNaN(parsed.getTime()) || parsed.getTime() <= Date.now())
+    return null;
+  const local = new Date(parsed.getTime() + 8 * 3600000)
+    .toISOString()
+    .slice(0, 16)
+    .replace("T", " ");
+  return local === `${y}-${m}-${d} ${h}:${min}` ? parsed.toISOString() : null;
+};
 
 export default function Passenger() {
-  const { data, update } = useDesignatedDriver();
-  const [tab, setTab] = useState<Tab>("叫代駕");
-  const [pickup, setPickup] = useState("中環蘭桂坊");
-  const [destination, setDestination] = useState("九龍塘");
-  const [plate, setPlate] = useState("AB1234");
-  const [vehicle, setVehicle] = useState("Toyota Corolla");
-  const [transmission, setTransmission] = useState<"自動波" | "手動波">("自動波");
-  const [condition, setCondition] = useState("車況正常（測試資料）");
-  const [policy, setPolicy] = useState("DEMO-POLICY-001");
-  const [expiry, setExpiry] = useState(() => {
-    const d = new Date(); d.setFullYear(d.getFullYear() + 1);
-    return [d.getFullYear(), String(d.getMonth() + 1).padStart(2, "0"), String(d.getDate()).padStart(2, "0")].join("-");
-  });
-  const [insured, setInsured] = useState(false);
-  const [authorized, setAuthorized] = useState(false);
-  const [isScheduled, setIsScheduled] = useState(false);
-  const [scheduledAt, setScheduledAt] = useState(today() + " 20:00");
-  const [minutes, setMinutes] = useState(45);
-  const [night, setNight] = useState(true);
-  const [paymentMethod, setPaymentMethod] = useState<"現金" | "轉數快">("現金");
-  const [locating, setLocating] = useState(false);
-  const [mapPoint, setMapPoint] = useState<{ latitude: number; longitude: number } | null>(null);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [tab, setTab] = useState<Tab>("首頁");
+  const [booting, setBooting] = useState(true),
+    [busy, setBusy] = useState(false),
+    [customer, setCustomer] = useState<Customer | null>(null),
+    [token, setToken] = useState<string | null>(null);
+  const [authMode, setAuthMode] = useState<"login" | "register">("login"),
+    [name, setName] = useState(""),
+    [email, setEmail] = useState(""),
+    [password, setPassword] = useState("");
+  const [pricing, setPricing] = useState<Pricing | null>(null),
+    [vehicles, setVehicles] = useState<Vehicle[]>([]),
+    [locations, setLocations] = useState<SavedLocation[]>([]),
+    [bookings, setBookings] = useState<Booking[]>([]);
+  const [vehicleId, setVehicleId] = useState<number>(0),
+    [vehicleForm, setVehicleForm] = useState<VehicleForm>(emptyVehicle),
+    [editingVehicle, setEditingVehicle] = useState<number | null>(null);
+  const [pickup, setPickup] = useState(""),
+    [destination, setDestination] = useState(""),
+    [pickupPoint, setPickupPoint] = useState<Point | null>(null),
+    [destinationPoint, setDestinationPoint] = useState<Point | null>(null),
+    [selecting, setSelecting] = useState<"pickup" | "destination">("pickup"),
+    [locating, setLocating] = useState(false),
+    [locationAllowed, setLocationAllowed] = useState(false);
+  const [route, setRoute] = useState<{ km: number; minutes: number } | null>(
+      null,
+    ),
+    [minutes, setMinutes] = useState(30),
+    [night, setNight] = useState(false),
+    [scheduled, setScheduled] = useState(false),
+    [scheduledAt, setScheduledAt] = useState(""),
+    [payment, setPayment] = useState<"cash" | "fps">("cash");
+  const [authorized, setAuthorized] = useState(false),
+    [insured, setInsured] = useState(false),
+    [confirming, setConfirming] = useState(false),
+    [selectedId, setSelectedId] = useState<number | null>(null),
+    [events, setEvents] = useState<{ event: string; created_at: string }[]>([]);
+  const [locationLabel, setLocationLabel] = useState(""),
+    [locationAddress, setLocationAddress] = useState("");
+  const selected = bookings.find((item) => item.id === selectedId) || null;
+  const active = useMemo(
+    () =>
+      bookings.filter(
+        (item) => !["completed", "cancelled"].includes(item.status),
+      ),
+    [bookings],
+  );
+  const fare = pricing
+    ? Math.max(
+        pricing.minimum_hkd,
+        Math.ceil(minutes / pricing.minutes_step) * pricing.per_15_minutes_hkd,
+      ) + (night ? pricing.night_hkd : 0)
+    : null;
+  const chosenVehicle = vehicles.find((item) => item.id === vehicleId) || null;
 
-  const estimate = Math.max(200, Math.ceil(minutes / 15) * 60) + (night ? 60 : 0);
-  const selected = data.bookings.find(b => b.id === selectedId) ?? null;
-  const active = useMemo(() => data.bookings.filter(b => !["completed", "cancelled"].includes(b.status)), [data.bookings]);
-
+  async function refresh(session: string) {
+    const [p, v, l, b] = await Promise.all([
+      passengerApi<Pricing>("/pricing"),
+      passengerApi<Vehicle[]>("/vehicles", session),
+      passengerApi<SavedLocation[]>("/locations", session),
+      passengerApi<Booking[]>("/bookings", session),
+    ]);
+    setPricing(p);
+    setVehicles(v);
+    setLocations(l);
+    setBookings(b);
+    setVehicleId((current) =>
+      v.some((item) => item.id === current) ? current : v[0]?.id || 0,
+    );
+  }
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const saved = await readSession();
+        if (saved) {
+          const person = await passengerApi<Customer>("/me", saved);
+          if (alive) {
+            setCustomer(person);
+            setToken(saved);
+            await refresh(saved);
+          }
+        } else {
+          const p = await passengerApi<Pricing>("/pricing");
+          if (alive) setPricing(p);
+        }
+      } catch (error) {
+        if (alive) {
+          await writeSession(null);
+          setToken(null);
+          setCustomer(null);
+          notice(problem(error));
+        }
+      } finally {
+        if (alive) setBooting(false);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
+  useEffect(() => {
+    if (tab !== "我的行程" || !token) return;
+    const timer = setInterval(() => {
+      passengerApi<Booking[]>("/bookings", token)
+        .then(setBookings)
+        .catch(() => {});
+    }, 15000);
+    return () => clearInterval(timer);
+  }, [tab, token]);
+  useEffect(() => {
+    if (!selectedId || !token) return;
+    passengerApi<{ event: string; created_at: string }[]>(
+      `/bookings/${selectedId}/events`,
+      token,
+    )
+      .then(setEvents)
+      .catch(() => setEvents([]));
+  }, [selectedId, token, bookings]);
+  async function authenticate() {
+    if (busy) return;
+    setBusy(true);
+    try {
+      if (authMode === "register")
+        await passengerApi("/customers/register", null, "POST", {
+          name,
+          email,
+          password,
+        });
+      const result = await passengerApi<{ token: string; customer: Customer }>(
+        "/customers/login",
+        null,
+        "POST",
+        { email, password },
+      );
+      await writeSession(result.token);
+      setToken(result.token);
+      setCustomer(result.customer);
+      await refresh(result.token);
+    } catch (error) {
+      notice(problem(error));
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function logout() {
+    if (token) await passengerApi("/logout", token, "POST").catch(() => {});
+    await writeSession(null);
+    setToken(null);
+    setCustomer(null);
+    setVehicles([]);
+    setBookings([]);
+    setTab("首頁");
+  }
+  function vehiclePatch<K extends keyof VehicleForm>(
+    key: K,
+    value: VehicleForm[K],
+  ) {
+    setVehicleForm((current) => ({ ...current, [key]: value }));
+  }
+  async function saveVehicle() {
+    if (!token) return;
+    setBusy(true);
+    try {
+      const item = await passengerApi<Vehicle>(
+        editingVehicle ? `/vehicles/${editingVehicle}` : "/vehicles",
+        token,
+        editingVehicle ? "PUT" : "POST",
+        vehicleForm,
+      );
+      await refresh(token);
+      setVehicleId(item.id);
+      setEditingVehicle(null);
+      setVehicleForm(emptyVehicle);
+      notice("車輛資料已儲存。");
+    } catch (error) {
+      notice(problem(error));
+    } finally {
+      setBusy(false);
+    }
+  }
+  function editVehicle(item: Vehicle) {
+    setVehicleForm({
+      plate: item.plate,
+      make: item.make,
+      model: item.model,
+      transmission: item.transmission,
+      requirements: item.requirements,
+      existing_damage: item.existing_damage,
+      insurance_company: item.insurance_company,
+      insurance_reference: item.insurance_reference,
+      insurance_expiry: item.insurance_expiry,
+    });
+    setEditingVehicle(item.id);
+    setTab("我的");
+  }
+  async function saveLocation() {
+    if (!token) return;
+    setBusy(true);
+    try {
+      await passengerApi("/locations", token, "POST", {
+        label: locationLabel,
+        address: locationAddress,
+      });
+      setLocationLabel("");
+      setLocationAddress("");
+      await refresh(token);
+      notice("常用地址已儲存。");
+    } catch (error) {
+      notice(problem(error));
+    } finally {
+      setBusy(false);
+    }
+  }
   async function useMyLocation() {
     try {
       setLocating(true);
       const permission = await Location.requestForegroundPermissionsAsync();
       if (permission.status !== "granted") {
-        notice("未獲定位權限，可以直接手動輸入上車地址。");
+        notice("未獲定位權限，可以手動輸入接車地址。");
         return;
       }
-      const position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-      const matches = await Location.reverseGeocodeAsync({
-        latitude: position.coords.latitude, longitude: position.coords.longitude,
+      setLocationAllowed(true);
+      const position = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
       });
-      const address = matches[0];
-      const formatted = address
-        ? [address.streetNumber, address.street, address.district, address.city].filter(Boolean).join(" ")
-        : position.coords.latitude.toFixed(5) + ", " + position.coords.longitude.toFixed(5);
-      setPickup(formatted);
-      setMapPoint({ latitude: position.coords.latitude, longitude: position.coords.longitude });
+      const point = {
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+      };
+      const result = await Location.reverseGeocodeAsync(point);
+      const address = result[0];
+      setPickup(
+        address
+          ? [
+              address.streetNumber,
+              address.street,
+              address.district,
+              address.city,
+            ]
+              .filter(Boolean)
+              .join(" ")
+          : `${point.latitude.toFixed(5)}, ${point.longitude.toFixed(5)}`,
+      );
+      setPickupPoint(point);
+      setRoute(null);
     } catch {
       notice("目前無法取得定位，請手動輸入地址。");
     } finally {
       setLocating(false);
     }
   }
-  async function selectOnMap(point: { latitude: number; longitude: number }) {
-    setMapPoint(point);
+  async function onMapSelect(point: Point) {
     try {
-      const results = await Location.reverseGeocodeAsync(point);
-      const addr = results[0];
-      setPickup(addr ? [addr.streetNumber, addr.street, addr.district, addr.city].filter(Boolean).join(" ") : `${point.latitude.toFixed(5)}, ${point.longitude.toFixed(5)}`);
+      const result = await Location.reverseGeocodeAsync(point);
+      const address = result[0];
+      const label = address
+        ? [address.streetNumber, address.street, address.district, address.city]
+            .filter(Boolean)
+            .join(" ")
+        : `${point.latitude.toFixed(5)}, ${point.longitude.toFixed(5)}`;
+      if (selecting === "pickup") {
+        setPickupPoint(point);
+        setPickup(label);
+      } else {
+        setDestinationPoint(point);
+        setDestination(label);
+      }
+      setRoute(null);
     } catch {
-      setPickup(`${point.latitude.toFixed(5)}, ${point.longitude.toFixed(5)}`);
+      notice("地址解析失敗，請手動輸入地址。");
     }
   }
-  function order() {
+  function validateOrder() {
+    if (
+      !pickup.trim() ||
+      !destination.trim() ||
+      pickup.trim() === destination.trim()
+    )
+      return "請填寫不同的接車地點和目的地";
+    if (!chosenVehicle) return "請先在「我的」儲存車輛";
+    if (scheduled && !scheduledIso(scheduledAt))
+      return "請填寫有效的未來預約時間（YYYY-MM-DD HH:mm）";
+    if (!authorized || !insured) return "請確認車主授權及保險聲明";
+    if (!fare) return "暫時無法取得後端收費設定";
+    return null;
+  }
+  async function createOrder() {
+    if (!token) return;
+    const invalid = validateOrder();
+    if (invalid) {
+      notice(invalid);
+      return;
+    }
+    setBusy(true);
     try {
-      const booking = createBooking({
-        pickup, destination, plate, vehicle, transmission, condition,
-        insuranceReference: policy, insuranceExpiry: expiry,
-        insuranceConfirmed: insured, authorization: authorized,
-        tripType: isScheduled ? "預約" : "即時",
-        scheduledAt: isScheduled ? scheduledAt : "即時出發",
-        estimatedFare: estimate, estimatedMinutes: minutes,
-        nightSurcharge: night, paymentMethod,
+      const result = await passengerApi<Booking>("/bookings", token, "POST", {
+        vehicle_id: vehicleId,
+        pickup: pickup.trim(),
+        destination: destination.trim(),
+        ...(pickupPoint && destinationPoint
+          ? {
+              pickup_lat: pickupPoint.latitude,
+              pickup_lng: pickupPoint.longitude,
+              dest_lat: destinationPoint.latitude,
+              dest_lng: destinationPoint.longitude,
+            }
+          : {}),
+        trip_type: scheduled ? "scheduled" : "now",
+        scheduled_at: scheduled ? scheduledIso(scheduledAt) : null,
+        estimate_minutes: minutes,
+        night_surcharge: night,
+        payment_method: payment,
+        owner_authorized: authorized,
+        insurance_confirmed: insured,
       });
-      update({ ...data, bookings: [booking, ...data.bookings] });
-      setSelectedId(booking.id);
+      await refresh(token);
+      setSelectedId(result.id);
+      setConfirming(false);
       setTab("我的行程");
-      notice("已建立本機測試訂單。現時未連接真實司機派單或付款服務。");
+      notice(
+        "測試訂單已存入乘客後端，目前等待安排司機；尚未接通司機派單或收款。",
+      );
     } catch (error) {
-      notice(error instanceof Error ? error.message : "資料有誤，請檢查。");
+      notice(problem(error));
+    } finally {
+      setBusy(false);
     }
   }
-  function cancel(booking: Booking) {
+  async function cancelOrder(id: number) {
+    if (!token) return;
+    setBusy(true);
     try {
-      const changed = advanceBooking(booking, "cancelled");
-      update({ ...data, bookings: data.bookings.map(b => b.id === booking.id ? changed : b) });
+      await passengerApi(`/bookings/${id}/cancel`, token, "POST");
+      await refresh(token);
     } catch (error) {
-      notice(error instanceof Error ? error.message : "此行程暫時無法取消，請聯絡客服。");
+      notice(problem(error));
+    } finally {
+      setBusy(false);
     }
   }
-
-  return <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
-    <View style={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 11, backgroundColor: C.white, flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-      <View>
-        <Text style={{ fontSize: 21, fontWeight: "900", color: C.green }}>安心代駕</Text>
-        <Text style={{ color: C.muted, marginTop: 2, fontSize: 12 }}>由司機駕駛你自己架車</Text>
+  const section = (title: string) => (
+    <Text style={{ fontSize: 18, fontWeight: "900", color: C.ink }}>
+      {title}
+    </Text>
+  );
+  return (
+    <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
+      <View
+        style={{
+          paddingHorizontal: 20,
+          paddingTop: 12,
+          paddingBottom: 11,
+          backgroundColor: C.white,
+          flexDirection: "row",
+          justifyContent: "space-between",
+          alignItems: "center",
+        }}
+      >
+        <View>
+          <Text style={{ fontSize: 21, fontWeight: "900", color: C.green }}>
+            安心代駕
+          </Text>
+          <Text style={{ color: C.muted, marginTop: 2, fontSize: 12 }}>
+            由司機駕駛你自己架車
+          </Text>
+        </View>
+        <View
+          style={{
+            paddingHorizontal: 10,
+            paddingVertical: 7,
+            backgroundColor: C.mist,
+            borderRadius: 99,
+          }}
+        >
+          <Text style={{ fontSize: 11, color: C.green, fontWeight: "800" }}>
+            乘客測試版
+          </Text>
+        </View>
       </View>
-      <View style={{ paddingHorizontal: 10, paddingVertical: 7, backgroundColor: C.mist, borderRadius: 99 }}>
-        <Text style={{ fontSize: 11, color: C.green, fontWeight: "800" }}>乘客測試版</Text>
-      </View>
-    </View>
-    <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
-      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingHorizontal: 17, paddingBottom: 26 }}>
-        {tab === "叫代駕" && <>
-          <Text style={{ color: C.ink, fontSize: 27, fontWeight: "900", marginTop: 24 }}>去邊度？我哋幫你揸。</Text>
-          <Text style={{ color: C.muted, marginTop: 7, lineHeight: 20 }}>司機上門接你同你架車，安全送到目的地。</Text>
-          <PassengerMap latitude={mapPoint?.latitude} longitude={mapPoint?.longitude} onSelect={selectOnMap}/>
-          <Card>
-            <Text style={{ fontSize: 18, fontWeight: "900", color: C.ink }}>行程資料</Text>
-            <Field label="司機到場接車位置" value={pickup} onChangeText={setPickup} hint="請輸入接車地址"/>
-            <Pressable onPress={useMyLocation} disabled={locating} style={{ flexDirection: "row", alignItems: "center", marginTop: 11, gap: 7 }}>
-              {locating ? <ActivityIndicator size="small" color={C.green2} /> : <Ionicons name="locate-outline" size={18} color={C.green2}/>}
-              <Text style={{ color: C.green2, fontWeight: "700" }}>{locating ? "正在取得你的位置" : "使用目前 GPS 位置"}</Text>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        style={{ flex: 1 }}
+      >
+        <ScrollView
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={{ paddingHorizontal: 17, paddingBottom: 26 }}
+        >
+          {booting ? (
+            <ActivityIndicator style={{ marginTop: 50 }} color={C.green} />
+          ) : !customer ? (
+            <>
+              <Text
+                style={{
+                  color: C.ink,
+                  fontSize: 27,
+                  fontWeight: "900",
+                  marginTop: 24,
+                }}
+              >
+                登入乘客帳戶
+              </Text>
+              <Text style={{ color: C.muted, marginTop: 7 }}>
+                登入後，你的車輛和測試訂單會儲存在乘客後端。
+              </Text>
+              <Card>
+                {section(authMode === "login" ? "登入" : "建立帳戶")}
+                {authMode === "register" && (
+                  <Field
+                    label="姓名"
+                    value={name}
+                    onChangeText={setName}
+                    hint="你的稱呼"
+                  />
+                )}
+                <Field
+                  label="電郵"
+                  value={email}
+                  onChangeText={setEmail}
+                  hint="name@example.com"
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                />
+                <Field
+                  label="密碼"
+                  value={password}
+                  onChangeText={setPassword}
+                  hint="最少 10 字元"
+                  autoCapitalize="none"
+                  secureTextEntry
+                />
+                <MainButton
+                  title={
+                    busy
+                      ? "處理中…"
+                      : authMode === "login"
+                        ? "登入"
+                        : "登記並登入"
+                  }
+                  onPress={authenticate}
+                  disabled={busy}
+                />
+                <MainButton
+                  outline
+                  title={authMode === "login" ? "建立新帳戶" : "已有帳戶？登入"}
+                  onPress={() =>
+                    setAuthMode(authMode === "login" ? "register" : "login")
+                  }
+                />
+              </Card>
+              <Text style={{ color: C.muted, marginTop: 14, lineHeight: 20 }}>
+                此版本供本機及測試網絡使用；正式營運前須完成司機派單、保險及付款服務。
+              </Text>
+            </>
+          ) : (
+            <>
+              {tab === "首頁" && (
+                <>
+                  <Text
+                    style={{
+                      color: C.ink,
+                      fontSize: 27,
+                      fontWeight: "900",
+                      marginTop: 24,
+                    }}
+                  >
+                    去邊度？我哋幫你揸。
+                  </Text>
+                  <Text
+                    style={{ color: C.muted, marginTop: 7, lineHeight: 20 }}
+                  >
+                    司機到你所在地，代你駕駛自己架車。
+                  </Text>
+                  <PassengerMap
+                    pickup={pickupPoint}
+                    destination={destinationPoint}
+                    selecting={selecting}
+                    showUserLocation={locationAllowed}
+                    onSelect={onMapSelect}
+                    onRoute={(km, duration) => {
+                      setRoute({ km, minutes: duration });
+                      setMinutes(Math.max(1, Math.ceil(duration)));
+                    }}
+                  />
+                  <Card>
+                    {section("行程資料")}
+                    <Text style={{ color: C.muted, marginTop: 10 }}>
+                      地圖選點：
+                    </Text>
+                    <Choice
+                      items={["pickup", "destination"] as const}
+                      value={selecting}
+                      onChange={setSelecting}
+                      display={(v) => (v === "pickup" ? "接車位置" : "目的地")}
+                    />
+                    <Field
+                      label="接車地點"
+                      value={pickup}
+                      onChangeText={(value) => {
+                        setPickup(value);
+                        setPickupPoint(null);
+                        setRoute(null);
+                      }}
+                      hint="請輸入香港接車地址"
+                    />
+                    <PassengerAddressSearch
+                      kind="pickup"
+                      onSelect={(address, point) => {
+                        setPickup(address);
+                        setPickupPoint(point);
+                        setRoute(null);
+                      }}
+                    />
+                    <Pressable
+                      onPress={useMyLocation}
+                      disabled={locating}
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        marginTop: 11,
+                        gap: 7,
+                      }}
+                    >
+                      {locating ? (
+                        <ActivityIndicator size="small" color={C.green2} />
+                      ) : (
+                        <Ionicons
+                          name="locate-outline"
+                          size={18}
+                          color={C.green2}
+                        />
+                      )}
+                      <Text style={{ color: C.green2, fontWeight: "700" }}>
+                        {locating ? "正在定位" : "使用目前 GPS 位置"}
+                      </Text>
+                    </Pressable>
+                    <Field
+                      label="目的地"
+                      value={destination}
+                      onChangeText={(value) => {
+                        setDestination(value);
+                        setDestinationPoint(null);
+                        setRoute(null);
+                      }}
+                      hint="請輸入香港目的地"
+                    />
+                    <PassengerAddressSearch
+                      kind="destination"
+                      onSelect={(address, point) => {
+                        setDestination(address);
+                        setDestinationPoint(point);
+                        setRoute(null);
+                      }}
+                    />
+                    {locations.length > 0 && (
+                      <>
+                        <Text style={{ color: C.muted, marginTop: 15 }}>
+                          常用地址作目的地
+                        </Text>
+                        <Choice
+                          items={locations.map((item) => item.id)}
+                          value={
+                            locations.find(
+                              (item) => item.address === destination,
+                            )?.id || 0
+                          }
+                          onChange={(id) => {
+                            const item = locations.find((x) => x.id === id);
+                            if (item) {
+                              setDestination(item.address);
+                              setDestinationPoint(
+                                item.latitude != null && item.longitude != null
+                                  ? {
+                                      latitude: item.latitude,
+                                      longitude: item.longitude,
+                                    }
+                                  : null,
+                              );
+                              setRoute(null);
+                            }
+                          }}
+                          display={(id) =>
+                            locations.find((x) => x.id === id)?.label || ""
+                          }
+                        />
+                      </>
+                    )}
+                    <Text
+                      style={{
+                        color: C.ink,
+                        fontWeight: "700",
+                        fontSize: 13,
+                        marginTop: 16,
+                      }}
+                    >
+                      出發時間
+                    </Text>
+                    <Choice
+                      items={["即時", "預約"] as const}
+                      value={scheduled ? "預約" : "即時"}
+                      onChange={(v) => setScheduled(v === "預約")}
+                    />
+                    {scheduled && (
+                      <Field
+                        label="預約日期時間（香港時間）"
+                        value={scheduledAt}
+                        onChangeText={setScheduledAt}
+                        hint="YYYY-MM-DD HH:mm"
+                        autoCapitalize="none"
+                      />
+                    )}
+                  </Card>
+                  <Card>
+                    {section("選擇你架車")}
+                    {vehicles.length === 0 ? (
+                      <>
+                        <Text style={{ color: C.muted, marginTop: 12 }}>
+                          未有已儲存車輛。先登記車牌、車款及保險資料。
+                        </Text>
+                        <MainButton
+                          title="登記車輛"
+                          outline
+                          onPress={() => setTab("我的")}
+                        />
+                      </>
+                    ) : (
+                      <Choice
+                        items={vehicles.map((item) => item.id)}
+                        value={vehicleId}
+                        onChange={setVehicleId}
+                        display={(id) => {
+                          const item = vehicles.find((x) => x.id === id);
+                          return item
+                            ? `${item.plate} · ${item.make} ${item.model}`
+                            : "";
+                        }}
+                      />
+                    )}
+                    {chosenVehicle && (
+                      <Text style={{ color: C.muted, marginTop: 10 }}>
+                        {chosenVehicle.transmission === "auto"
+                          ? "自動波"
+                          : "手動波"}{" "}
+                        · 保險到期 {chosenVehicle.insurance_expiry}
+                      </Text>
+                    )}
+                  </Card>
+                  <Card>
+                    {section("預計車資")}
+                    {route ? (
+                      <Text style={{ color: C.green2, marginTop: 10 }}>
+                        地圖路線：約 {route.km.toFixed(1)} 公里，約{" "}
+                        {Math.ceil(route.minutes)} 分鐘
+                      </Text>
+                    ) : (
+                      <Text style={{ color: C.muted, marginTop: 10 }}>
+                        未有可用路線時間，請手動選擇測試預計車程。
+                      </Text>
+                    )}
+                    <Choice
+                      items={[15, 30, 45, 60, 90] as const}
+                      value={minutes}
+                      onChange={(n) => {
+                        setMinutes(n);
+                        setRoute(null);
+                      }}
+                      display={(n) => `${n} 分鐘`}
+                    />
+                    <Check
+                      value={night}
+                      onChange={setNight}
+                      text={`深夜附加費（測試 +HK$${pricing?.night_hkd ?? 60}）`}
+                    />
+                    <Text
+                      style={{
+                        marginTop: 16,
+                        fontSize: 29,
+                        fontWeight: "900",
+                        color: C.green,
+                      }}
+                    >
+                      HK$ {fare ?? "—"}
+                    </Text>
+                    <Text
+                      style={{ color: C.muted, fontSize: 12, lineHeight: 18 }}
+                    >
+                      測試報價：最低 HK${pricing?.minimum_hkd ?? 200}，每 15
+                      分鐘 HK${pricing?.per_15_minutes_hkd ?? 60}。
+                      {route ? "時間由地圖路線提供；" : "時間由你手動選擇；"}
+                      正式收費及路線須後續核實。
+                    </Text>
+                    <Text
+                      style={{
+                        marginTop: 15,
+                        color: C.ink,
+                        fontSize: 13,
+                        fontWeight: "700",
+                      }}
+                    >
+                      付款方式（未接駁收款）
+                    </Text>
+                    <Choice
+                      items={["cash", "fps"] as const}
+                      value={payment}
+                      onChange={setPayment}
+                      display={(v) => (v === "cash" ? "現金" : "轉數快")}
+                    />
+                    <Text
+                      style={{ color: C.muted, marginTop: 9, fontSize: 12 }}
+                    >
+                      信用卡付款尚未接駁。
+                    </Text>
+                  </Card>
+                  <Card>
+                    {section("授權及保險")}
+                    <Check
+                      value={authorized}
+                      onChange={setAuthorized}
+                      text="我是車主，或已獲車主授權代駕司機駕駛此車。"
+                    />
+                    <Check
+                      value={insured}
+                      onChange={setInsured}
+                      text="我已確認車輛保險容許收費代駕安排，並明白平台目前未核實保單。"
+                    />
+                    <MainButton
+                      title="查看訂單資料"
+                      onPress={() => {
+                        const invalid = validateOrder();
+                        invalid ? notice(invalid) : setConfirming(true);
+                      }}
+                    />
+                    <Text
+                      style={{
+                        color: C.muted,
+                        fontSize: 11,
+                        lineHeight: 18,
+                        marginTop: 11,
+                      }}
+                    >
+                      目前只會建立後端測試訂單；不會通知真實司機或扣款。
+                    </Text>
+                  </Card>
+                  {confirming && (
+                    <Card>
+                      {section("確認代駕")}
+                      <Row label="接車" value={pickup} />
+                      <Row label="目的地" value={destination} />
+                      <Row
+                        label="車輛"
+                        value={
+                          chosenVehicle
+                            ? `${chosenVehicle.plate} · ${chosenVehicle.make} ${chosenVehicle.model}`
+                            : "—"
+                        }
+                      />
+                      <Row
+                        label="時間"
+                        value={scheduled ? scheduledAt : "即時"}
+                      />
+                      <Row
+                        label="預計車程"
+                        value={`${minutes} 分鐘${route ? "（地圖路線）" : "（手動測試）"}`}
+                      />
+                      <Row label="預計車資" value={`HK$ ${fare}`} />
+                      <Row
+                        label="付款"
+                        value={`${payment === "cash" ? "現金" : "轉數快"}（待付款）`}
+                      />
+                      <Text
+                        style={{
+                          color: C.muted,
+                          marginTop: 12,
+                          lineHeight: 20,
+                        }}
+                      >
+                        你已確認車主授權及保險聲明。訂單建立後狀態為「等待安排司機」，不代表已派單。
+                      </Text>
+                      <MainButton
+                        title={busy ? "建立中…" : "確認建立測試訂單"}
+                        onPress={createOrder}
+                        disabled={busy}
+                      />
+                      <MainButton
+                        title="返回修改"
+                        outline
+                        onPress={() => setConfirming(false)}
+                      />
+                    </Card>
+                  )}
+                </>
+              )}
+              {tab === "我的行程" && (
+                <>
+                  <Text
+                    style={{
+                      color: C.ink,
+                      fontSize: 27,
+                      fontWeight: "900",
+                      marginTop: 24,
+                    }}
+                  >
+                    我的行程
+                  </Text>
+                  <Text style={{ color: C.muted, marginTop: 7 }}>
+                    實際資料來自乘客後端；司機資訊待正式接駁。
+                  </Text>
+                  <Card>
+                    {section(`進行中及預約（${active.length}）`)}
+                    {active.length === 0 && (
+                      <Text style={{ color: C.muted, marginTop: 12 }}>
+                        目前沒有進行中的代駕訂單。
+                      </Text>
+                    )}
+                    {active.map((item) => (
+                      <Pressable
+                        key={item.id}
+                        onPress={() => setSelectedId(item.id)}
+                        style={{
+                          paddingVertical: 14,
+                          borderBottomWidth: 1,
+                          borderBottomColor: C.border,
+                        }}
+                      >
+                        <Text style={{ color: C.ink, fontWeight: "800" }}>
+                          {item.pickup} → {item.destination}
+                        </Text>
+                        <Text
+                          style={{
+                            color: C.green2,
+                            marginTop: 5,
+                            fontWeight: "700",
+                          }}
+                        >
+                          {statuses[item.status] || item.status}
+                        </Text>
+                        <Text
+                          style={{ color: C.muted, fontSize: 12, marginTop: 3 }}
+                        >
+                          {item.trip_type === "scheduled" ? "預約" : "即時"} ·{" "}
+                          {item.plate}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </Card>
+                  <Card>
+                    {section(`過往及所有訂單（${bookings.length}）`)}
+                    {bookings.length === 0 && (
+                      <Text style={{ color: C.muted, marginTop: 12 }}>
+                        你仲未有行程紀錄。
+                      </Text>
+                    )}
+                    {bookings.map((item) => (
+                      <Pressable
+                        key={item.id}
+                        onPress={() => setSelectedId(item.id)}
+                        style={{
+                          paddingVertical: 12,
+                          borderBottomWidth: 1,
+                          borderBottomColor: C.border,
+                        }}
+                      >
+                        <Text style={{ color: C.ink, fontWeight: "700" }}>
+                          #{item.id} {item.pickup} → {item.destination}
+                        </Text>
+                        <Text
+                          style={{ color: C.muted, fontSize: 12, marginTop: 4 }}
+                        >
+                          {statuses[item.status] || item.status} ·{" "}
+                          {new Date(item.created_at).toLocaleDateString(
+                            "zh-HK",
+                          )}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </Card>
+                  {selected && (
+                    <Card>
+                      {section(`訂單 #${selected.id}`)}
+                      <Text
+                        style={{
+                          color: C.green2,
+                          fontWeight: "800",
+                          marginTop: 10,
+                        }}
+                      >
+                        {statuses[selected.status] || selected.status}
+                      </Text>
+                      <Row label="接車" value={selected.pickup} />
+                      <Row label="目的地" value={selected.destination} />
+                      <Row
+                        label="車輛"
+                        value={`${selected.plate} · ${selected.make} ${selected.model}`}
+                      />
+                      <Row
+                        label="出發"
+                        value={
+                          selected.trip_type === "scheduled" &&
+                          selected.scheduled_at
+                            ? new Date(selected.scheduled_at).toLocaleString(
+                                "zh-HK",
+                              )
+                            : "即時"
+                        }
+                      />
+                      <Row
+                        label="預計車程"
+                        value={`${selected.estimate_minutes} 分鐘（手動測試）`}
+                      />
+                      <Row
+                        label="預計車資"
+                        value={`HK$ ${selected.fare_hkd}（測試）`}
+                      />
+                      <Row
+                        label="付款"
+                        value={`${selected.payment_method === "cash" ? "現金" : "轉數快"} · 未付款`}
+                      />
+                      <Text
+                        style={{
+                          color: C.muted,
+                          marginTop: 12,
+                          lineHeight: 20,
+                          fontSize: 12,
+                        }}
+                      >
+                        司機姓名、相片、評分、到達時間及 GPS
+                        位置，須待真實司機後端接通；本版本沒有虛構司機資料。正式付款前不會產生電子收據。
+                      </Text>
+                      {events.map((event, index) => (
+                        <Text
+                          key={`${event.created_at}-${index}`}
+                          style={{ color: C.muted, marginTop: 8, fontSize: 12 }}
+                        >
+                          {new Date(event.created_at).toLocaleString("zh-HK")} ·{" "}
+                          {event.event}
+                        </Text>
+                      ))}
+                      {selected.status === "awaiting_arrangement" && (
+                        <MainButton
+                          title={busy ? "處理中…" : "取消此測試訂單"}
+                          outline
+                          onPress={() => cancelOrder(selected.id)}
+                          disabled={busy}
+                        />
+                      )}
+                    </Card>
+                  )}
+                </>
+              )}
+              {tab === "我的" && (
+                <>
+                  <Text
+                    style={{
+                      color: C.ink,
+                      fontSize: 27,
+                      fontWeight: "900",
+                      marginTop: 24,
+                    }}
+                  >
+                    我的帳戶
+                  </Text>
+                  <Card>
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 13,
+                      }}
+                    >
+                      <View
+                        style={{
+                          backgroundColor: C.mist,
+                          padding: 15,
+                          borderRadius: 100,
+                        }}
+                      >
+                        <Ionicons
+                          name="person-outline"
+                          size={25}
+                          color={C.green}
+                        />
+                      </View>
+                      <View>
+                        <Text
+                          style={{
+                            fontWeight: "800",
+                            fontSize: 17,
+                            color: C.ink,
+                          }}
+                        >
+                          {customer.name}
+                        </Text>
+                        <Text
+                          style={{ color: C.muted, marginTop: 4, fontSize: 12 }}
+                        >
+                          {customer.email}
+                        </Text>
+                      </View>
+                    </View>
+                    <MainButton title="登出" outline onPress={logout} />
+                  </Card>
+                  <Card>
+                    {section("已儲存車輛")}
+                    {vehicles.map((item) => (
+                      <Pressable
+                        key={item.id}
+                        onPress={() => editVehicle(item)}
+                        style={{
+                          paddingVertical: 12,
+                          borderBottomWidth: 1,
+                          borderBottomColor: C.border,
+                        }}
+                      >
+                        <Text style={{ fontWeight: "800", color: C.ink }}>
+                          {item.plate} · {item.make} {item.model}
+                        </Text>
+                        <Text style={{ color: C.muted, marginTop: 4 }}>
+                          {item.transmission === "auto" ? "自動波" : "手動波"} ·
+                          保險到期 {item.insurance_expiry} · 點按編輯
+                        </Text>
+                      </Pressable>
+                    ))}
+                    <Text
+                      style={{
+                        color: C.green,
+                        marginTop: 17,
+                        fontWeight: "800",
+                      }}
+                    >
+                      {editingVehicle ? "編輯車輛" : "新增車輛"}
+                    </Text>
+                    <Field
+                      label="車牌號碼"
+                      value={vehicleForm.plate}
+                      onChangeText={(v) => vehiclePatch("plate", v)}
+                      hint="例如 AB1234"
+                      autoCapitalize="characters"
+                    />
+                    <Field
+                      label="汽車品牌"
+                      value={vehicleForm.make}
+                      onChangeText={(v) => vehiclePatch("make", v)}
+                      hint="例如 Toyota"
+                    />
+                    <Field
+                      label="型號"
+                      value={vehicleForm.model}
+                      onChangeText={(v) => vehiclePatch("model", v)}
+                      hint="例如 Corolla"
+                    />
+                    <Text
+                      style={{
+                        color: C.ink,
+                        fontWeight: "700",
+                        fontSize: 13,
+                        marginTop: 16,
+                      }}
+                    >
+                      波箱
+                    </Text>
+                    <Choice
+                      items={["auto", "manual"] as const}
+                      value={vehicleForm.transmission}
+                      onChange={(v) => vehiclePatch("transmission", v)}
+                      display={(v) => (v === "auto" ? "自動波" : "手動波")}
+                    />
+                    <Field
+                      label="特殊駕駛要求"
+                      value={vehicleForm.requirements}
+                      onChangeText={(v) => vehiclePatch("requirements", v)}
+                      hint="如有請填寫"
+                    />
+                    <Field
+                      label="現有車輛損傷"
+                      value={vehicleForm.existing_damage}
+                      onChangeText={(v) => vehiclePatch("existing_damage", v)}
+                      hint="如有請描述"
+                    />
+                    <Field
+                      label="保險公司"
+                      value={vehicleForm.insurance_company}
+                      onChangeText={(v) => vehiclePatch("insurance_company", v)}
+                      hint="車輛保險公司"
+                    />
+                    <Field
+                      label="保單參考"
+                      value={vehicleForm.insurance_reference}
+                      onChangeText={(v) =>
+                        vehiclePatch("insurance_reference", v)
+                      }
+                      hint="只在可信測試環境填寫"
+                    />
+                    <Field
+                      label="保險到期日"
+                      value={vehicleForm.insurance_expiry}
+                      onChangeText={(v) => vehiclePatch("insurance_expiry", v)}
+                      hint="YYYY-MM-DD"
+                      autoCapitalize="none"
+                    />
+                    <MainButton
+                      title={busy ? "儲存中…" : "儲存車輛"}
+                      onPress={saveVehicle}
+                      disabled={busy}
+                    />
+                    {editingVehicle && (
+                      <MainButton
+                        title="取消編輯"
+                        outline
+                        onPress={() => {
+                          setEditingVehicle(null);
+                          setVehicleForm(emptyVehicle);
+                        }}
+                      />
+                    )}
+                  </Card>
+                  <Card>
+                    {section("常用地址")}
+                    {locations.map((item) => (
+                      <View
+                        key={item.id}
+                        style={{
+                          paddingVertical: 10,
+                          borderBottomWidth: 1,
+                          borderBottomColor: C.border,
+                        }}
+                      >
+                        <Text style={{ color: C.ink, fontWeight: "700" }}>
+                          {item.label}
+                        </Text>
+                        <Text style={{ color: C.muted }}>{item.address}</Text>
+                      </View>
+                    ))}
+                    <Field
+                      label="地址名稱"
+                      value={locationLabel}
+                      onChangeText={setLocationLabel}
+                      hint="例如屋企"
+                    />
+                    <Field
+                      label="香港地址"
+                      value={locationAddress}
+                      onChangeText={setLocationAddress}
+                      hint="請輸入地址"
+                    />
+                    <MainButton
+                      title="儲存常用地址"
+                      outline
+                      onPress={saveLocation}
+                      disabled={busy}
+                    />
+                  </Card>
+                  <Card>
+                    {section("付款及支援")}
+                    <Text
+                      style={{ color: C.muted, marginTop: 10, lineHeight: 21 }}
+                    >
+                      現金及轉數快只作付款方式記錄，未有收款服務。信用卡設定、客服渠道、私隱政策及服務條款，須正式營運前提供核准內容及服務資料。
+                    </Text>
+                    <MainButton
+                      title="查看行程紀錄"
+                      outline
+                      onPress={() => setTab("我的行程")}
+                    />
+                  </Card>
+                  <PassengerInfo />
+                </>
+              )}
+            </>
+          )}
+        </ScrollView>
+      </KeyboardAvoidingView>
+      {customer && (
+        <View
+          style={{
+            flexDirection: "row",
+            backgroundColor: C.white,
+            borderTopWidth: 1,
+            borderColor: C.border,
+            paddingBottom: Platform.OS === "ios" ? 8 : 4,
+          }}
+        >
+          {(["首頁", "我的行程", "我的"] as const).map((item) => (
+            <Pressable
+              key={item}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: tab === item }}
+              onPress={() => {
+                setTab(item);
+                setConfirming(false);
+              }}
+              style={{
+                flex: 1,
+                paddingVertical: 13,
+                alignItems: "center",
+                gap: 3,
+              }}
+            >
+              <Ionicons
+                name={
+                  item === "首頁"
+                    ? "home-outline"
+                    : item === "我的行程"
+                      ? "calendar-outline"
+                      : "person-outline"
+                }
+                size={21}
+                color={tab === item ? C.green : C.muted}
+              />
+              <Text
+                style={{
+                  fontSize: 12,
+                  color: tab === item ? C.green : C.muted,
+                  fontWeight: "800",
+                }}
+              >
+                {item}
+              </Text>
             </Pressable>
-            <Field label="目的地" value={destination} onChangeText={setDestination} hint="請輸入目的地"/>
-            <Text style={{ color: C.ink, fontWeight: "700", fontSize: 13, marginTop: 16 }}>出發時間</Text>
-            <Choice items={["即時", "預約"] as const} value={isScheduled ? "預約" : "即時"} onChange={v => setIsScheduled(v === "預約")}/>
-            {isScheduled && <Field label="預約日期時間" value={scheduledAt} onChangeText={setScheduledAt} hint="YYYY-MM-DD HH:mm" autoCapitalize="none"/>}
-          </Card>
-          <Card>
-            <Text style={{ fontSize: 18, fontWeight: "900", color: C.ink }}>你架車嘅資料</Text>
-            <Field label="車牌號碼" value={plate} onChangeText={setPlate} hint="例如 AB1234" autoCapitalize="characters"/>
-            <Field label="車款" value={vehicle} onChangeText={setVehicle} hint="例如 Toyota Corolla"/>
-            <Text style={{ color: C.ink, fontWeight: "700", fontSize: 13, marginTop: 16 }}>波箱類型</Text>
-            <Choice items={["自動波", "手動波"] as const} value={transmission} onChange={setTransmission}/>
-            <Field label="車況及原有損傷" value={condition} onChangeText={setCondition} hint="例如車身已有刮痕"/>
-          </Card>
-          <Card>
-            <Text style={{ fontSize: 18, fontWeight: "900", color: C.ink }}>車資試算</Text>
-            <Text style={{ marginTop: 12, fontSize: 13, color: C.muted }}>預計行車時間（手動選擇，非 GPS 路線估價）</Text>
-            <Choice items={[15, 30, 45, 60, 90] as const} value={minutes} onChange={setMinutes} display={n => n + " 分鐘"}/>
-            <Check value={night} onChange={setNight} text="深夜附加費（示範 +HK$60）"/>
-            <Text style={{ marginTop: 16, fontSize: 29, fontWeight: "900", color: C.green }}>HK$ {estimate}</Text>
-            <Text style={{ color: C.muted, fontSize: 12, lineHeight: 18 }}>示範算法：最低 HK$200，每 15 分鐘 HK$60。實際價格及行車時間待正式接駁路線服務後確認。</Text>
-            <Text style={{ marginTop: 15, color: C.ink, fontSize: 13, fontWeight: "700" }}>付款方式（測試版不會收錢）</Text>
-            <Choice items={["現金", "轉數快"] as const} value={paymentMethod} onChange={setPaymentMethod}/>
-          </Card>
-          <Card>
-            <Text style={{ fontSize: 18, fontWeight: "900", color: C.ink }}>保險及授權確認</Text>
-            <Field label="保單參考（只填測試資料）" value={policy} onChangeText={setPolicy} hint="DEMO-POLICY-001"/>
-            <Field label="保險到期日" value={expiry} onChangeText={setExpiry} hint="YYYY-MM-DD" autoCapitalize="none"/>
-            <Check value={insured} onChange={setInsured} text="我已確認適用保險容許此類收費代駕安排，並了解平台正式營運前仍須核實。"/>
-            <Check value={authorized} onChange={setAuthorized} text="我是車主，或已獲車主授權代駕司機駕駛此車。"/>
-            <MainButton title="確認代駕訂單（測試）" onPress={order}/>
-            <Text style={{ color: C.muted, fontSize: 11, lineHeight: 18, marginTop: 11 }}>目前僅建立本機測試訂單；不會派遣真實司機、不會扣款，亦不代表平台已核保。請勿輸入真實身份及保單資料。</Text>
-          </Card>
-        </>}
-        {tab === "我的行程" && <>
-          <Text style={{ color: C.ink, fontSize: 27, fontWeight: "900", marginTop: 24 }}>我的行程</Text>
-          <Text style={{ color: C.muted, marginTop: 7 }}>查看預約狀態及過往行程。</Text>
-          <Card>
-            <Text style={{ color: C.ink, fontSize: 17, fontWeight: "900" }}>進行中（{active.length}）</Text>
-            {active.length === 0 && <Text style={{ marginTop: 13, color: C.muted }}>目前沒有進行中的代駕訂單。</Text>}
-            {active.map(b => <Pressable onPress={() => setSelectedId(b.id)} key={b.id} style={{ paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: C.border }}>
-              <Text style={{ color: C.ink, fontWeight: "800" }}>{b.pickup} → {b.destination}</Text>
-              <Text style={{ color: C.green2, marginTop: 6, fontWeight: "700" }}>{STATUSES[b.status]}</Text>
-              <Text style={{ color: C.muted, fontSize: 12, marginTop: 4 }}>{b.tripType} · {b.plate}</Text>
-            </Pressable>)}
-          </Card>
-          <Card>
-            <Text style={{ color: C.ink, fontSize: 17, fontWeight: "900" }}>所有行程（{data.bookings.length}）</Text>
-            {data.bookings.length === 0 && <Text style={{ color: C.muted, marginTop: 12 }}>你仲未有行程紀錄。</Text>}
-            {data.bookings.map(b => <Pressable key={b.id} onPress={() => setSelectedId(b.id)} style={{ paddingVertical: 13, borderBottomWidth: 1, borderBottomColor: C.border }}>
-              <Text style={{ color: C.ink, fontWeight: "700" }}>{b.pickup} → {b.destination}</Text>
-              <Text style={{ color: C.muted, fontSize: 12, marginTop: 4 }}>{STATUSES[b.status]} · {new Date(b.createdAt).toLocaleDateString("zh-HK")}</Text>
-            </Pressable>)}
-          </Card>
-          {selected && <Card>
-            <Text style={{ fontSize: 17, fontWeight: "900", color: C.ink }}>訂單詳情</Text>
-            <Text style={{ marginTop: 12, fontWeight: "800", color: C.green2 }}>{STATUSES[selected.status]}</Text>
-            <Text style={{ marginTop: 8, color: C.ink }}>{selected.pickup} → {selected.destination}</Text>
-            <Text style={{ marginTop: 6, color: C.muted }}>車牌：{selected.plate} · {selected.vehicle}</Text>
-            <Text style={{ marginTop: 6, color: C.muted }}>時間：{selected.scheduledAt}</Text>
-            <Text style={{ marginTop: 6, color: C.muted }}>試算車費：HK$ {selected.estimatedFare ?? "未記錄"}</Text>
-            <Text style={{ marginTop: 6, color: C.muted }}>付款：{selected.paymentMethod ?? "未設定"}（未收款）</Text>
-            <Text style={{ marginTop: 10, color: C.muted, fontSize: 12 }}>訂單僅保存在本機。司機及位置資料未接駁，狀態不會自動變更。</Text>
-            {["requested", "accepted", "arrived"].includes(selected.status) && <MainButton title="取消此測試訂單" outline onPress={() => cancel(selected)}/>}
-          </Card>}
-        </>}
-        {tab === "我的" && <>
-          <Text style={{ color: C.ink, fontSize: 27, fontWeight: "900", marginTop: 24 }}>我的帳戶</Text>
-          <Card>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 13 }}>
-              <View style={{ backgroundColor: C.mist, padding: 15, borderRadius: 100 }}><Ionicons name="person-outline" size={25} color={C.green}/></View>
-              <View><Text style={{ fontWeight: "800", fontSize: 17, color: C.ink }}>乘客測試帳戶</Text><Text style={{ color: C.muted, marginTop: 4, fontSize: 12 }}>此版本無需登入</Text></View>
-            </View>
-          </Card>
-          <Card>
-            <Text style={{ color: C.ink, fontSize: 18, fontWeight: "900" }}>我嘅車輛</Text>
-            <Text style={{ color: C.muted, marginTop: 11 }}>{plate} · {vehicle} · {transmission}</Text>
-            <MainButton title="編輯車輛資料" outline onPress={() => setTab("叫代駕")}/>
-          </Card>
-          <Card>
-            <Text style={{ color: C.ink, fontSize: 18, fontWeight: "900" }}>測試版說明</Text>
-            <Text style={{ color: C.muted, lineHeight: 21, marginTop: 10 }}>只提供乘客功能。暫未接入真正會員登入、司機派單、路線計算、網上付款、保險核保或跨手機訂單同步。</Text>
-            <MainButton title="清除本機測試訂單" outline onPress={() => {
-              if (Platform.OS === "web") {
-                if (typeof window !== "undefined" && window.confirm("確定清除所有本機測試訂單？")) { update(initialState()); setSelectedId(null); }
-              } else Alert.alert("清除測試訂單", "確定要清除本機測試紀錄？", [{ text: "取消" }, { text: "清除", style: "destructive", onPress: () => { update(initialState()); setSelectedId(null); } }]);
-            }}/>
-          </Card>
-        </>}
-      </ScrollView>
-    </KeyboardAvoidingView>
-    <View style={{ flexDirection: "row", paddingTop: 9, paddingBottom: 7, borderTopColor: C.border, borderTopWidth: 1, backgroundColor: C.white }}>
-      {([{ tab: "叫代駕", icon: "navigate-outline" }, { tab: "我的行程", icon: "receipt-outline" }, { tab: "我的", icon: "person-outline" }] as const).map(item =>
-        <Pressable key={item.tab} onPress={() => setTab(item.tab)} accessibilityRole="tab" accessibilityState={{ selected: tab === item.tab }} style={{ flex: 1, alignItems: "center", paddingVertical: 5, gap: 4 }}>
-          <Ionicons name={item.icon} size={23} color={tab === item.tab ? C.green2 : "#91A29A"}/>
-          <Text style={{ fontSize: 11, fontWeight: "700", color: tab === item.tab ? C.green2 : "#91A29A" }}>{item.tab}</Text>
-        </Pressable>
+          ))}
+        </View>
       )}
-    </View>
-  </SafeAreaView>;
+    </SafeAreaView>
+  );
 }

@@ -1,5 +1,5 @@
 import { useUser } from "@clerk/clerk-expo";
-import { StripeProvider } from "@stripe/stripe-react-native";
+import { StripeProvider } from "@/components/legacy-stripe";
 import { Image, Text, View } from "react-native";
 
 import { Payment } from "@/components/payment";
