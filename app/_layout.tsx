@@ -1,63 +1,18 @@
-import { ClerkProvider, ClerkLoaded } from "@clerk/clerk-expo";
-import { useFonts } from "expo-font";
+import "react-native-gesture-handler";
 import { Stack } from "expo-router";
-import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
-import { useEffect } from "react";
-import { LogBox } from "react-native";
-import "react-native-reanimated";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 
-import { tokenCache } from "@/lib/auth";
-import { DEMO_MODE } from "@/lib/dev-mode";
-
-// Prevent the splash screen from auto-hiding before asset loading is complete.
-SplashScreen.preventAutoHideAsync();
-
-LogBox.ignoreAllLogs();
-
-const RootLayout = () => {
-  const [loaded] = useFonts({
-    "Jakarta-Bold": require("../assets/fonts/PlusJakartaSans-Bold.ttf"),
-    "Jakarta-ExtraBold": require("../assets/fonts/PlusJakartaSans-ExtraBold.ttf"),
-    "Jakarta-ExtraLight": require("../assets/fonts/PlusJakartaSans-ExtraLight.ttf"),
-    "Jakarta-Light": require("../assets/fonts/PlusJakartaSans-Light.ttf"),
-    "Jakarta-Medium": require("../assets/fonts/PlusJakartaSans-Medium.ttf"),
-    "Jakarta-Regular": require("../assets/fonts/PlusJakartaSans-Regular.ttf"),
-    "Jakarta-SemiBold": require("../assets/fonts/PlusJakartaSans-SemiBold.ttf"),
-  });
-
-  useEffect(() => {
-    if (loaded) {
-      SplashScreen.hideAsync();
-    }
-  }, [loaded]);
-
-  if (!loaded) {
-    return null;
-  }
-
-  if (DEMO_MODE) return <><Stack><Stack.Screen name="index" options={{ headerShown: false }} /><Stack.Screen name="anxin-demo" options={{ headerShown: false }} />
-          <Stack.Screen name="passenger" options={{ headerShown: false }} /></Stack><StatusBar style="dark" /></>;
-
-  const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY!;
-
-  if (!publishableKey) throw new Error("Missing Clerk Publishable Key.");
-
+// iPhone passenger preview: the existing Clerk/driver screens remain in the
+// repository, but the preview startup does not require production API keys.
+export default function RootLayout() {
   return (
-    <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
-      <ClerkLoaded>
-        <Stack>
-          <Stack.Screen name="index" options={{ headerShown: false }} />
-          <Stack.Screen name="anxin-demo" options={{ headerShown: false }} />
-          <Stack.Screen name="passenger" options={{ headerShown: false }} />
-          <Stack.Screen name="(root)" options={{ headerShown: false }} />
-          <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-        </Stack>
-
-        <StatusBar style="dark" />
-      </ClerkLoaded>
-    </ClerkProvider>
+    <SafeAreaProvider>
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="index" />
+        <Stack.Screen name="passenger" />
+      </Stack>
+      <StatusBar style="dark" />
+    </SafeAreaProvider>
   );
-};
-
-export default RootLayout;
+}
