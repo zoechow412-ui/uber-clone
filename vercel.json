@@ -1,0 +1,10 @@
+{
+  "buildCommand": "npx expo export --platform web",
+  "installCommand": "npm install --legacy-peer-deps --no-audit --no-fund",
+  "outputDirectory": "dist",
+  "framework": null,
+  "cleanUrls": true,
+  "rewrites": [
+    { "source": "/:path*", "destination": "/" }
+  ]
+}
