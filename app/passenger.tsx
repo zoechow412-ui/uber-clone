@@ -79,7 +79,7 @@ function Choice<T extends string | number>({ items, value, onChange, display }: 
       key={String(item)} onPress={() => onChange(item)}
       accessibilityRole="button" accessibilityState={{ selected: value === item }}
       style={{ paddingHorizontal: 13, paddingVertical: 11, borderRadius: 12, backgroundColor: value === item ? C.mist : C.bg, borderWidth: 1, borderColor: value === item ? C.green2 : C.border }}
-    ><Text style={{ fontWeight: "700", color: value === item ? C.green : C.muted }}>{display ? display(item) : String(item)}</Text></Press>)}
+    ><Text style={{ fontWeight: "700", color: value === item ? C.green : C.muted }}>{display ? display(item) : String(item)}</Text></Pressable>)}
   </View>;
 }
 function Check({ value, onChange, text }: { value: boolean; onChange: (v: boolean) => void; text: string }) {
