@@ -1,28 +1,32 @@
-# 安心代駕｜乘客版 App（開發測試版）
+# 安心代駕｜香港代駕乘客版 iPhone 測試程式
 
-直接沿用 [Ryde — Uber Clone](https://github.com/sanidhyy/uber-clone) 的 React Native / Expo 原始碼，並保留原項目的 MIT 授權。本倉庫現有乘客專用畫面位於 `app/passenger.tsx`，在預設測試模式會直接進入乘客 App。
+此專案沿用 [Ryde / Uber Clone](https://github.com/sanidhyy/uber-clone) 的 Expo / React Native 模板，保留原項目 MIT 授權。本分支已將 Expo 升級至 **SDK 57**，以供 iPhone 測試準備。
 
-## 乘客版範圍
+**目前是本機開發測試 App，不是真正派單服務。** 不要用作真實預約或收費。
 
-- 「叫代駕」：接車點／目的地、原生地圖點選接車位置、手機 GPS 填寫接車點、即時或預約、客人自己架車嘅車牌／車款／波箱、原有損傷、保險及車主授權核對。
-- 「車資試算」：以自選預計時間計算示範報價（最低 HK$200，每 15 分鐘 HK$60，可加示範深夜費 HK$60）；**非真實路線估價**。
-- 「我的行程」：建立、查看、取消本機測試訂單及報價。
-- 「我的」：車輛資料及測試說明。
-- **不展示司機接單、司機審核或管理後台**；舊試驗程式保留在原碼但不作乘客導航入口。
+## 乘客版現有功能
 
-## 免費本機測試
+- 乘客畫面：`app/passenger.tsx`，預設啟動後直接開啟
+- GPS 定位、Apple Maps 選擇上車點，亦可手動輸入地址
+- 起點、目的地、車款、車牌、波箱、保險及車主授權欄位
+- 即時或預約、本機模擬車資、建立及取消測試訂單
+- 訂單只保存在本機，**無真實派單、付款或跨手機同步**
 
-需要 Node.js。將 GitHub 專案 Clone 到電腦：
+## iPhone 安裝
 
-```sh
-npm install --legacy-peer-deps
-npx expo start --go
+完整指引：[iOS 測試及 TestFlight 步驟](docs/IOS_TESTING.md)
+
+需要 Node.js 22.13+：
+
+```bash
+npm ci
+npx expo-doctor
+npx tsc --noEmit
+npx expo export --platform ios
 ```
 
-此專案仍使用舊版 **Expo SDK 51**。Android 可以用對應 SDK 51 的 Expo Go 或 Android 模擬器測試；實體 iPhone 的新版 Expo Go **不能直接開啟 SDK 51 專案**，需先升級 Expo SDK 或另行建立 Development Build。啟動後先選「即時」，填寫測試資料、勾選測試授權、建立測試訂單，再到「我的行程」查看。手機 GPS 需要授予定位權限，亦可直接手動填地址。
+Apple Developer Program、Expo 登入及 EAS Build 簽名設定，仍需由有權限嘅帳戶持有人完成。iOS ad hoc 測試用 `ios-internal`；TestFlight 用 `ios-testflight`。
 
-測試版使用 Zustand 與本機儲存；**不需要 Google Maps API Key、Stripe 或 Clerk 才能啟動預設乘客測試畫面**。
+## 版本與驗收
 
-## 上線前必須補齊
-
-真正地圖選點與路線時間、雲端會員登入、跨手機同步、司機派單、管理後台、實際車資、支付、通知、車輛及司機保險驗證，全部仍待建置。請勿把本機測試訂單當作真實預約，請勿輸入真實身份或保險資料。在香港接受有償代駕前，必須先完成適用法律及保險確認。
+本升級由 Expo SDK 51 跨至 SDK 57、React 19.2、React Native 0.86，包含 NativeWind 4 樣式遷移。GitHub Actions 檢查將驗證依賴、TypeScript 同 iOS JavaScript 打包，但 **唔代替原生 iPhone 安裝及實測**。請先完成檢查和真機測試，再合併到 main。
