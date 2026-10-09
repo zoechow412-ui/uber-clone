@@ -7,11 +7,11 @@
 需要 Node.js 及 pnpm。安裝依賴後執行：
 
 ```sh
-pnpm install
+pnpm install --ignore-scripts
 pnpm exec expo start
 ```
 
-用 Expo Go 掃描終端機顯示的 QR code 開啟手機版。按 `w` 可以試開 Web 版；如某個 Expo 原生模組不支援瀏覽器，請改用 Expo Go。測試畫面會直接開啟「安心代駕」開發版，無須 Clerk、Google Maps、Neon 或 Stripe 金鑰。
+用 Expo Go 掃描終端機顯示的 QR code 開啟手機版。測試畫面會直接開啟「安心代駕」開發版，無須 Clerk、Google Maps、Neon 或 Stripe 金鑰。此 Expo 51 專案以手機版為測試目標。
 
 ## 建議測試流程
 
