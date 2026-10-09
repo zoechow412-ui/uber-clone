@@ -1,0 +1,27 @@
+name: iPhone preview checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  ios-javascript:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js 22 (Expo SDK 57)
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.23.1"
+      - name: Install packages (no stale SDK 51 lockfile)
+        run: npm install --legacy-peer-deps --no-audit --no-fund
+      - name: Verify app.json and EAS configuration
+        run: node -e "const a=require('./app.json'); const e=require('./eas.json'); if(!a.expo.ios.bundleIdentifier || !e.build['ios-preview']) process.exit(1);"
+      - name: Run Expo SDK compatibility checks
+        run: npx expo-doctor@latest
+      - name: Export iOS JavaScript bundle
+        run: npx expo export --platform ios --clear
