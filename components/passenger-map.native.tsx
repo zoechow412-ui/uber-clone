@@ -7,8 +7,8 @@ export function PassengerMap({ latitude, longitude, onSelect }: PassengerMapProp
   return <View style={{ height: 228, borderRadius: 20, overflow: "hidden", marginTop: 17, backgroundColor: "#E7F2ED" }}>
     <MapView
       style={{ flex: 1 }}
-      initialRegion={{ latitude: 22.2819, longitude: 114.1588, latitudeDelta: 0.07, longitudeDelta: 0.07 }}
-      region={hasLocation ? { latitude: latitude!, longitude: longitude!, latitudeDelta: 0.012, longitudeDelta: 0.012 } : undefined}
+      key={hasLocation ? `${latitude!.toFixed(4)}-${longitude!.toFixed(4)}` : "hk"}
+      initialRegion={{ latitude: hasLocation ? latitude! : 22.2819, longitude: hasLocation ? longitude! : 114.1588, latitudeDelta: hasLocation ? 0.012 : 0.07, longitudeDelta: hasLocation ? 0.012 : 0.07 }}
       onPress={e => onSelect?.(e.nativeEvent.coordinate)}
       showsCompass
       showsBuildings
