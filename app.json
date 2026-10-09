@@ -8,11 +8,6 @@
     "icon": "./assets/images/icon.png",
     "scheme": "anxin",
     "userInterfaceStyle": "light",
-    "splash": {
-      "image": "./assets/images/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#103C31"
-    },
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "hk.anxin.designateddriver",
