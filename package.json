@@ -92,7 +92,9 @@
     "react-native-web": "~0.21.0",
     "stripe": "^16.9.0",
     "zustand": "^4.5.5",
-    "react-native-worklets": "0.10.1"
+    "react-native-worklets": "0.10.1",
+    "expo-auth-session": "~57.0.14",
+    "expo-crypto": "~57.0.3"
   },
   "devDependencies": {
     "@babel/core": "^7.20.0",
