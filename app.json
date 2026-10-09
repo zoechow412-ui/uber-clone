@@ -1,22 +1,25 @@
 {
   "expo": {
     "name": "安心代駕",
-    "description": "香港代客駕駛客人自有車輛的本機開發測試版。",
-    "githubUrl": "https://github.com/zoechow412-ui/uber-clone",
+    "description": "香港乘客版代駕 App（開發測試，非真實派單）",
     "slug": "anxin-designated-driver",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "anxin",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "light",
     "splash": {
       "image": "./assets/images/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#2F80ED"
+      "backgroundColor": "#103C31"
     },
     "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "hk.anxin.designateddriver"
+      "supportsTablet": false,
+      "bundleIdentifier": "hk.anxin.designateddriver",
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "安心代駕只會在你使用定位功能時取得目前位置，以協助填寫接車地點。"
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -27,24 +30,29 @@
     },
     "web": {
       "bundler": "metro",
-      "output": "server",
+      "output": "static",
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
+      "expo-router",
       [
-        "expo-router",
+        "expo-location",
         {
-          "origin": "https://example.com/"
+          "locationWhenInUsePermission": "安心代駕只會在你使用定位功能時取得目前位置，以協助填寫接車地點。"
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/splash.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#103C31"
         }
       ]
     ],
     "experiments": {
       "typedRoutes": true
-    },
-    "extra": {
-      "router": {
-        "origin": "https://example.com/"
-      },
     }
   }
 }
