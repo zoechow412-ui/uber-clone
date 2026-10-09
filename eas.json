@@ -1,21 +1,36 @@
 {
+  "cli": {
+    "version": ">= 16.0.0",
+    "appVersionSource": "local"
+  },
   "build": {
     "preview": {
       "android": {
         "buildType": "apk"
       }
     },
-    "preview2": {
-      "android": {
-        "gradleCommand": ":app:assembleRelease"
+    "ios-simulator": {
+      "distribution": "internal",
+      "ios": {
+        "simulator": true
       }
     },
-    "preview3": {
-      "developmentClient": true
+    "ios-preview": {
+      "distribution": "internal",
+      "ios": {
+        "simulator": false
+      }
     },
-    "preview4": {
-      "distribution": "internal"
-    },
-    "production": {}
+    "production": {
+      "distribution": "store",
+      "ios": {
+        "autoIncrement": true
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": {}
+    }
   }
 }
