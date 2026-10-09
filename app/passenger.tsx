@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { PassengerMap } from "@/components/passenger-map";
 import * as Location from "expo-location";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -42,7 +42,7 @@ function notice(message: string) {
     Alert.alert("安心代駕", message);
   }
 }
-function Card({ children }: { children: React.ReactNode }) {
+function Card({ children }: { children: ReactNode }) {
   return <View style={{ marginTop: 14, padding: 18, borderRadius: 20, backgroundColor: C.white, borderWidth: 1, borderColor: C.border }}>{children}</View>;
 }
 function Field({ label, value, onChangeText, hint, autoCapitalize = "sentences" }: {
