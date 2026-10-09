@@ -8,6 +8,7 @@ import { LogBox } from "react-native";
 import "react-native-reanimated";
 
 import { tokenCache } from "@/lib/auth";
+import { DEMO_MODE } from "@/lib/dev-mode";
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
@@ -35,6 +36,8 @@ const RootLayout = () => {
     return null;
   }
 
+  if (DEMO_MODE) return <><Stack><Stack.Screen name="index" options={{ headerShown: false }} /><Stack.Screen name="anxin-demo" options={{ headerShown: false }} /></Stack><StatusBar style="dark" /></>;
+
   const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY!;
 
   if (!publishableKey) throw new Error("Missing Clerk Publishable Key.");
@@ -44,6 +47,7 @@ const RootLayout = () => {
       <ClerkLoaded>
         <Stack>
           <Stack.Screen name="index" options={{ headerShown: false }} />
+          <Stack.Screen name="anxin-demo" options={{ headerShown: false }} />
           <Stack.Screen name="(root)" options={{ headerShown: false }} />
           <Stack.Screen name="(auth)" options={{ headerShown: false }} />
         </Stack>

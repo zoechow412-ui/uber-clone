@@ -1,13 +1,13 @@
 {
   "expo": {
-    "name": "Ryde",
-    "description": "Find your perfect ride with Ryde.",
-    "githubUrl": "https://github.com/sanidhyy/uber-clone",
-    "slug": "Ryde",
+    "name": "安心代駕",
+    "description": "香港代客駕駛客人自有車輛的本機開發測試版。",
+    "githubUrl": "https://github.com/zoechow412-ui/uber-clone",
+    "slug": "anxin-designated-driver",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "ryde",
+    "scheme": "anxin",
     "userInterfaceStyle": "automatic",
     "splash": {
       "image": "./assets/images/splash.png",
@@ -16,14 +16,14 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.sanidhyy.Ryde"
+      "bundleIdentifier": "hk.anxin.designateddriver"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.sanidhyy.Ryde"
+      "package": "hk.anxin.designateddriver"
     },
     "web": {
       "bundler": "metro",
@@ -45,9 +45,6 @@
       "router": {
         "origin": "https://example.com/"
       },
-      "eas": {
-        "projectId": "fe645595-95a5-45b2-825d-aa6a0ddb2b9c"
-      }
     }
   }
 }
