@@ -14,18 +14,18 @@ export function PassengerMap(_props: PassengerMapProps) {
     <View
       style={{
         height: 194,
-        backgroundColor: "#E7F2ED",
+        backgroundColor: "#1C1C1E",
         marginTop: 17,
         borderRadius: 20,
         justifyContent: "center",
         alignItems: "center",
       }}
     >
-      <Ionicons name="map-outline" color="#176E54" size={46} />
-      <Text style={{ color: "#103C31", fontWeight: "800", marginTop: 10 }}>
+      <Ionicons name="map-outline" color="#C9A96B" size={46} />
+      <Text style={{ color: "#FFFFFF", fontWeight: "800", marginTop: 10 }}>
         香港地圖
       </Text>
-      <Text style={{ color: "#687670", fontSize: 12, marginTop: 5 }}>
+      <Text style={{ color: "#A5A5A5", fontSize: 12, marginTop: 5 }}>
         網頁測試版可手動輸入地址；手機版可地圖選點
       </Text>
     </View>

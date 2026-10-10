@@ -5,6 +5,28 @@ import { View, Text } from "react-native";
 import { useEffect, useRef } from "react";
 import type { PassengerMapProps } from "./passenger-map";
 
+const darkMap = [
+  { elementType: "geometry", stylers: [{ color: "#202124" }] },
+  { elementType: "labels.text.fill", stylers: [{ color: "#B8B4AA" }] },
+  { elementType: "labels.text.stroke", stylers: [{ color: "#202124" }] },
+  {
+    featureType: "road",
+    elementType: "geometry",
+    stylers: [{ color: "#363638" }],
+  },
+  {
+    featureType: "road",
+    elementType: "geometry.stroke",
+    stylers: [{ color: "#29292B" }],
+  },
+  {
+    featureType: "water",
+    elementType: "geometry",
+    stylers: [{ color: "#0C2234" }],
+  },
+  { featureType: "poi", stylers: [{ visibility: "off" }] },
+];
+
 export function PassengerMap({
   pickup,
   destination,
@@ -32,12 +54,14 @@ export function PassengerMap({
         borderRadius: 20,
         overflow: "hidden",
         marginTop: 17,
-        backgroundColor: "#E7F2ED",
+        backgroundColor: "#1C1C1E",
       }}
     >
       <MapView
         ref={mapRef}
         style={{ flex: 1 }}
+        userInterfaceStyle="dark"
+        customMapStyle={darkMap}
         initialRegion={{
           latitude: 22.2819,
           longitude: 114.1588,
@@ -50,10 +74,10 @@ export function PassengerMap({
         showsUserLocation={showUserLocation}
       >
         {pickup && (
-          <Marker coordinate={pickup} title="接車位置" pinColor="#176E54" />
+          <Marker coordinate={pickup} title="接車位置" pinColor="#C9A96B" />
         )}
         {destination && (
-          <Marker coordinate={destination} title="目的地" pinColor="#C87131" />
+          <Marker coordinate={destination} title="目的地" pinColor="#E37E79" />
         )}
         {pickup && destination && directionsKey && (
           <MapViewDirections
@@ -61,7 +85,7 @@ export function PassengerMap({
             destination={destination}
             apikey={directionsKey}
             strokeWidth={4}
-            strokeColor="#103C31"
+            strokeColor="#C9A96B"
             onReady={(result) => onRoute?.(result.distance, result.duration)}
           />
         )}
@@ -72,7 +96,7 @@ export function PassengerMap({
           left: 10,
           bottom: 10,
           right: 10,
-          backgroundColor: "rgba(255,255,255,0.92)",
+          backgroundColor: "rgba(20,20,21,0.94)",
           borderRadius: 10,
           paddingVertical: 7,
           paddingHorizontal: 12,
@@ -80,7 +104,7 @@ export function PassengerMap({
       >
         <Text
           style={{
-            color: "#103C31",
+            color: "#E1C686",
             fontSize: 11,
             fontWeight: "700",
             textAlign: "center",

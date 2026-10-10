@@ -183,3 +183,40 @@ test("SQLite 重新開啟後仍保留乘客車輛和測試訂單", () => {
     rmdirSync(dir);
   }
 });
+
+test("刪除帳戶會清除其登入、車輛、地址、訂單及待付款記錄", () => {
+  const { core, first, second, vehicle } = setup();
+  const session = core.login("zoe@test.local", "StrongPass123!");
+  core.saveLocation(first, { label: "屋企", address: "中環皇后大道中" });
+  core.createBooking(first, { ...trip, vehicle_id: vehicle.id });
+  assert.deepEqual(core.deleteAccount(first), { ok: true });
+  assert.throws(() => core.authenticate(session.token), { status: 401 });
+  assert.equal(
+    core.db
+      .prepare("SELECT COUNT(*) AS n FROM customers WHERE id=?")
+      .get(first.id).n,
+    0,
+  );
+  for (const table of ["customer_vehicles", "saved_locations", "bookings"]) {
+    assert.equal(
+      core.db
+        .prepare("SELECT COUNT(*) AS n FROM " + table + " WHERE customer_id=?")
+        .get(first.id).n,
+      0,
+    );
+  }
+  assert.equal(
+    core.db.prepare("SELECT COUNT(*) AS n FROM booking_events").get().n,
+    0,
+  );
+  assert.equal(
+    core.db.prepare("SELECT COUNT(*) AS n FROM payments").get().n,
+    0,
+  );
+  assert.equal(
+    core.db
+      .prepare("SELECT COUNT(*) AS n FROM customers WHERE id=?")
+      .get(second.id).n,
+    1,
+  );
+});

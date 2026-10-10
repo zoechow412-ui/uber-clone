@@ -127,6 +127,29 @@ export function createPassengerCore(file = ":memory:", configuration = {}) {
     q("DELETE FROM sessions WHERE token=?").run(token);
     return { ok: true };
   }
+  function deleteAccount(customer) {
+    // All dependent test records are removed in one transaction.
+    db.exec("BEGIN IMMEDIATE");
+    try {
+      const bookings = q("SELECT id FROM bookings WHERE customer_id=?").all(
+        customer.id,
+      );
+      for (const booking of bookings) {
+        q("DELETE FROM payments WHERE booking_id=?").run(booking.id);
+        q("DELETE FROM booking_events WHERE booking_id=?").run(booking.id);
+      }
+      q("DELETE FROM bookings WHERE customer_id=?").run(customer.id);
+      q("DELETE FROM customer_vehicles WHERE customer_id=?").run(customer.id);
+      q("DELETE FROM saved_locations WHERE customer_id=?").run(customer.id);
+      q("DELETE FROM sessions WHERE customer_id=?").run(customer.id);
+      q("DELETE FROM customers WHERE id=?").run(customer.id);
+      db.exec("COMMIT");
+      return { ok: true };
+    } catch (error) {
+      db.exec("ROLLBACK");
+      throw error;
+    }
+  }
 
   function validateVehicle(data) {
     const plate = text(data.plate, 12).toUpperCase().replace(/\s+/g, "");
@@ -378,6 +401,7 @@ export function createPassengerCore(file = ":memory:", configuration = {}) {
     login,
     authenticate,
     logout,
+    deleteAccount,
     listVehicles,
     saveVehicle,
     deleteVehicle,

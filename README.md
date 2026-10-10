@@ -8,6 +8,7 @@
 - 電郵密碼登入；車輛、保險資料及常用地址儲存於乘客 API 的 SQLite 資料庫，依帳戶限制讀寫。
 - 即時／預約代駕、訂單確認、後端測試報價、現金／轉數快待付款、建立／查看／取消測試訂單。
 - 收費測試公式由後端設定：最低 HK$200、每 15 分鐘 HK$60、深夜加 HK$60。無路線時間時須由乘客手動選擇時間，畫面會標明測試報價。
+- 黑金手機介面按「首頁 → 路線 → 車輛及付款 → 確認」分步操作；帳戶可自助永久刪除，連同測試訂單、車輛及地址一併刪除。
 
 **服務尚未正式營運。**訂單雖儲存在後端，但沒有真實司機派單、即時司機位置、線上付款、保單核保或電子收據。訂單狀態會停留「等待安排司機」，除非乘客取消。請勿把測試訂單當作已預約真實代駕。
 
@@ -38,6 +39,19 @@ pnpm exec expo start --go --lan
 
 安裝符合 SDK 57 的 Expo Go，掃描終端機 QR Code。iPhone 的 Expo Go 須與 Expo CLI 登入同一個 Expo 帳戶。Android 模擬器如沒有設定環境變數，可使用預設 `http://10.0.2.2:8094`。實體手機一定要用區域網絡 IP，不可用 `127.0.0.1` 指向電腦。
 
+## iOS App Store 建置
+
+此專案已設定 iOS bundle ID、App 圖示、深色外觀、定位權限說明，以及 EAS production 上架建置設定。現時只有 iOS JS bundle 已成功輸出，尚未有簽署 IPA、TestFlight 或 App Store 上架版本。
+
+正式建置前，須先部署乘客 API 至公開 HTTPS 地址，於 EAS 建置環境設定 EXPO_PUBLIC_PASSENGER_API_URL。production 設定會拒絕沒有 HTTPS 地址的建置，避免把手機版指向 127.0.0.1。登入 Expo 及 Apple Developer Program 並完成 Apple 簽署後，可執行：
+
+```powershell
+pnpm dlx eas-cli build --platform ios --profile production
+pnpm dlx eas-cli submit --platform ios --profile production
+```
+
+提交審核前仍須接通真正司機派單和營運後端，提供可用客服、正式私隱政策網址、服務條款、保險及付款流程，以及 App Store Connect 資料與審核測試帳戶。現有測試訂單不可當成正式可履約服務提交。
+
 ## 選用地圖服務
 
 `app.config.js` 會從 `GOOGLE_MAPS_ANDROID_KEY`、`GOOGLE_MAPS_IOS_KEY` 注入原生地圖建置設定。手機地址搜尋和路線分別使用 `EXPO_PUBLIC_GOOGLE_PLACES_ANDROID_KEY`／`IOS_KEY` 及 `EXPO_PUBLIC_GOOGLE_DIRECTIONS_ANDROID_KEY`／`IOS_KEY`。未提供 Key 時不呼叫這些付費 API；地圖選點及手動測試報價仍可用。Google Key 應限制 Android package／簽名或 iOS bundle ID；`EXPO_PUBLIC_` 值會進 App bundle，不能當作秘密。Google 地圖相關服務可能收費，請先自行確認配額及啟用條件。Map ID 目前不需要。
@@ -49,6 +63,7 @@ pnpm typecheck
 pnpm test:passenger
 pnpm exec expo export --platform web --output-dir dist-web
 pnpm exec expo export --platform android --output-dir dist-android
+pnpm exec expo export --platform ios --output-dir dist-ios
 ```
 
 網頁預覽不可代替 iPhone／Android 實機地圖與定位驗證。正式上線仍須完成伺服器部署、安全防護、付款、派單、保險／法律核實、客服、私隱政策與服務條款。

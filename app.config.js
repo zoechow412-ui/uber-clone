@@ -1,5 +1,12 @@
 const base = require("./app.base.json").expo;
 
+if (
+  process.env.APP_ENV === "production" &&
+  !/^https:\/\/[^\s/]+/.test(process.env.EXPO_PUBLIC_PASSENGER_API_URL || "")
+) {
+  throw new Error("正式 iOS 建置必須設定 HTTPS EXPO_PUBLIC_PASSENGER_API_URL");
+}
+
 module.exports = () => ({
   ...base,
   ios: {

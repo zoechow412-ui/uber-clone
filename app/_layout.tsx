@@ -27,7 +27,7 @@ export default function RootLayout() {
         <Stack.Screen name="index" />
         <Stack.Screen name="passenger" />
       </Stack>
-      <StatusBar style="dark" />
+      <StatusBar style="light" />
     </>
   );
 }

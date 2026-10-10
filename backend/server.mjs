@@ -95,6 +95,8 @@ const handler = async (req, res) => {
     }
     if (method === "GET" && path === "/api/me")
       return json(req, res, 200, customer(req));
+    if (method === "DELETE" && path === "/api/me")
+      return json(req, res, 200, core.deleteAccount(customer(req)));
     if (method === "POST" && path === "/api/logout") {
       customer(req);
       return json(req, res, 200, core.logout(bearer(req)));
