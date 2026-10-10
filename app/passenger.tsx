@@ -456,6 +456,7 @@ export default function Passenger() {
     setVehicles([]);
     setBookings([]);
     setTab("首頁");
+    setBookingStep("home");
   }
   function confirmDeleteAccount() {
     const run = async () => {
@@ -471,6 +472,7 @@ export default function Passenger() {
         setBookings([]);
         setSelectedId(null);
         setTab("首頁");
+        setBookingStep("home");
         notice("帳戶及本測試服務所儲存的個人資料已刪除。");
       } catch (error) {
         notice(problem(error));
@@ -1675,6 +1677,7 @@ export default function Passenger() {
               onPress={() => {
                 setTab(item);
                 setConfirming(false);
+                if (item === "首頁") setBookingStep("home");
               }}
               style={{
                 flex: 1,
